@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ファイルビューア</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input[type="password"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+        }
+        
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+            color: #667eea;
+        }
+        
+        .error {
+            display: none;
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #c62828;
+        }
+        
+        .success {
+            display: none;
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #2e7d32;
+        }
+        
+        .files-container {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .files-title {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .file-item {
+            background: #f8f9fa;
+            margin: 10px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .file-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .file-link {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+        
+        .file-link:hover {
+            background: #e9ecef;
+            color: #667eea;
+        }
+        
+        .file-icon {
+            font-size: 1.5em;
+            margin-right: 12px;
+            color: #dc3545;
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            font-size: 1.1em;
+            margin-bottom: 4px;
+        }
+        
+        .file-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 ファイルビューア</h1>
+        
+        <form id="passwordForm">
+            <div class="form-group">
+                <label for="password">パスワードを入力してください</label>
+                <input type="password" id="password" name="password" required placeholder="パスワード">
+            </div>
+            <button type="submit" id="submitBtn">
+                <span id="buttonText">送信</span>
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>認証中...</p>
+        </div>
+        
+        <div class="error" id="errorMessage"></div>
+        <div class="success" id="successMessage"></div>
+        
+        <div class="files-container" id="filesContainer">
+            <h2 class="files-title">📄 利用可能なPDFファイル</h2>
+            <ul class="file-list" id="fileList"></ul>
+        </div>
+    </div>
+
+    <script>
+        // GASのWebアプリURLを設定（後で実際のURLに変更）
+        const GAS_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+        
+        document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const buttonText = document.getElementById('buttonText');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            const filesContainer = document.getElementById('filesContainer');
+            
+            // UIをリセット
+            hideAllMessages();
+            
+            // ローディング状態に設定
+            submitBtn.disabled = true;
+            buttonText.textContent = '認証中...';
+            loading.style.display = 'block';
+            
+            try {
+                // JSONPを使用してGASにリクエストを送信（CORS回避）
+                const jsonpUrl = `${GAS_URL}?password=${encodeURIComponent(password)}&callback=handleResponse`;
+                
+                console.log('Sending JSONP request to:', jsonpUrl);
+                
+                // JSONPリクエストを作成
+                const script = document.createElement('script');
+                script.src = jsonpUrl;
+                
+                // グローバルコールバック関数を定義
+                window.handleResponse = function(data) {
+                    console.log('JSONP Response data:', data);
+                    
+                    // スクリプトタグを削除
+                    document.head.removeChild(script);
+                    
+                    if (data.success) {
+                        // 成功時
+                        successMessage.textContent = 'パスワード認証に成功しました！';
+                        successMessage.style.display = 'block';
+                        
+                        // ファイル一覧を表示
+                        displayFiles(data.files);
+                        
+                    } else {
+                        // 失敗時
+                        errorMessage.textContent = data.message || 'パスワードが正しくありません。';
+                        errorMessage.style.display = 'block';
+                    }
+                    
+                    // ローディング状態を解除
+                    submitBtn.disabled = false;
+                    buttonText.textContent = '送信';
+                    loading.style.display = 'none';
+                };
+                
+                // エラーハンドリング
+                script.onerror = function() {
+                    console.error('JSONP request failed');
+                    errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらく後でもう一度お試しください。';
+                    errorMessage.style.display = 'block';
+                    
+                    // ローディング状態を解除
+                    submitBtn.disabled = false;
+                    buttonText.textContent = '送信';
+                    loading.style.display = 'none';
+                    
+                    // スクリプトタグを削除
+                    if (script.parentNode) {
+                        document.head.removeChild(script);
+                    }
+                };
+                
+                // スクリプトをDOMに追加してリクエストを実行
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらく後でもう一度お試しください。';
+                errorMessage.style.display = 'block';
+                
+                // ローディング状態を解除
+                submitBtn.disabled = false;
+                buttonText.textContent = '送信';
+                loading.style.display = 'none';
+            }
+        });
+        
+        function hideAllMessages() {
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('filesContainer').style.display = 'none';
+        }
+        
+        function displayFiles(files) {
+            const fileList = document.getElementById('fileList');
+            const filesContainer = document.getElementById('filesContainer');
+            
+            // ファイルリストをクリア
+            fileList.innerHTML = '';
+            
+            if (files && files.length > 0) {
+                files.forEach(file => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'file-item';
+                    
+                    const link = document.createElement('a');
+                    link.href = file.url;
+                    link.className = 'file-link';
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    
+                    // PDFアイコン
+                    const icon = document.createElement('div');
+                    icon.className = 'file-icon';
+                    icon.textContent = '📄';
+                    
+                    // ファイル情報コンテナ
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-info';
+                    
+                    // ファイル名
+                    const fileName = document.createElement('div');
+                    fileName.className = 'file-name';
+                    fileName.textContent = file.name;
+                    
+                    // ファイル詳細（サイズと更新日）
+                    const fileDetails = document.createElement('div');
+                    fileDetails.className = 'file-details';
+                    
+                    const updateDate = new Date(file.lastModified);
+                    const formattedDate = updateDate.toLocaleDateString('ja-JP');
+                    fileDetails.textContent = `${file.size} • 更新日: ${formattedDate}`;
+                    
+                    // 要素を組み立て
+                    fileInfo.appendChild(fileName);
+                    fileInfo.appendChild(fileDetails);
+                    
+                    link.appendChild(icon);
+                    link.appendChild(fileInfo);
+                    listItem.appendChild(link);
+                    fileList.appendChild(listItem);
+                });
+                
+                filesContainer.style.display = 'block';
+            } else {
+                const listItem = document.createElement('li');
+                listItem.className = 'file-item';
+                listItem.innerHTML = '<div class="file-link"><div class="file-icon">📁</div><div class="file-info"><div class="file-name">利用可能なPDFファイルがありません。</div></div></div>';
+                fileList.appendChild(listItem);
+                filesContainer.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
