@@ -217,97 +217,139 @@
     </div>
 
     <script>
-        // GASのWebアプリURLを設定（後で実際のURLに変更）
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyFgrivnyhzJRKJQWPAfm4KS-I-jMtVGNo9S11U9uYJj5Hjln0pV3LguhLxBF_vpL3F/exec';
         
-        document.getElementById('passwordForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const password = document.getElementById('password').value;
-            const submitBtn = document.getElementById('submitBtn');
-            const buttonText = document.getElementById('buttonText');
-            const loading = document.getElementById('loading');
-            const errorMessage = document.getElementById('errorMessage');
-            const successMessage = document.getElementById('successMessage');
-            const filesContainer = document.getElementById('filesContainer');
-            
-            // UIをリセット
-            hideAllMessages();
-            
-            // ローディング状態に設定
-            submitBtn.disabled = true;
-            buttonText.textContent = '認証中...';
-            loading.style.display = 'block';
-            
-            try {
-                // JSONPを使用してGASにリクエストを送信（CORS回避）
-                const jsonpUrl = `${GAS_URL}?password=${encodeURIComponent(password)}&callback=handleResponse`;
-                
-                console.log('Sending JSONP request to:', jsonpUrl);
-                
-                // JSONPリクエストを作成
-                const script = document.createElement('script');
-                script.src = jsonpUrl;
-                
-                // グローバルコールバック関数を定義
-                window.handleResponse = function(data) {
-                    console.log('JSONP Response data:', data);
-                    
-                    // スクリプトタグを削除
-                    document.head.removeChild(script);
-                    
-                    if (data.success) {
-                        // 成功時
-                        successMessage.textContent = 'パスワード認証に成功しました！';
-                        successMessage.style.display = 'block';
-                        
-                        // ファイル一覧を表示
-                        displayFiles(data.files);
-                        
-                    } else {
-                        // 失敗時
-                        errorMessage.textContent = data.message || 'パスワードが正しくありません。';
-                        errorMessage.style.display = 'block';
-                    }
-                    
-                    // ローディング状態を解除
-                    submitBtn.disabled = false;
-                    buttonText.textContent = '送信';
-                    loading.style.display = 'none';
-                };
-                
-                // エラーハンドリング
-                script.onerror = function() {
-                    console.error('JSONP request failed');
-                    errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらく後でもう一度お試しください。';
-                    errorMessage.style.display = 'block';
-                    
-                    // ローディング状態を解除
-                    submitBtn.disabled = false;
-                    buttonText.textContent = '送信';
-                    loading.style.display = 'none';
-                    
-                    // スクリプトタグを削除
-                    if (script.parentNode) {
-                        document.head.removeChild(script);
-                    }
-                };
-                
-                // スクリプトをDOMに追加してリクエストを実行
-                document.head.appendChild(script);
-                
-            } catch (error) {
-                console.error('Error:', error);
-                errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらく後でもう一度お試しください。';
-                errorMessage.style.display = 'block';
-                
-                // ローディング状態を解除
-                submitBtn.disabled = false;
-                buttonText.textContent = '送信';
-                loading.style.display = 'none';
+document.addEventListener('DOMContentLoaded', () => {
+    // =================================================================
+    // 設定項目
+    // =================================================================
+
+    //【最重要】必ずGASの「リダイレクト後の最終的なURL」を設定してください
+    // 1. GASのWebアプリURLをブラウザで一度開く
+    // 2. 表示されたアドレスバーのURLをコピーして貼り付ける
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyFgrivnyhzJRKJQWPAfm4KS-I-jMtVGNo9S11U9uYJj5Hjln0pV3LguhLxBF_vpL3F/exec'; // ← あなたの最終URLに書き換えてください
+
+
+    // =================================================================
+    // 要素の取得
+    // =================================================================
+
+    const passwordForm = document.getElementById('passwordForm');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('submitBtn');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loading');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const filesContainer = document.getElementById('filesContainer');
+
+
+    // =================================================================
+    // イベントリスナー
+    // =================================================================
+
+    passwordForm.addEventListener('submit', async (e) => {
+        e.preventDefault(); // フォームのデフォルト送信をキャンセル
+
+        const password = passwordInput.value;
+
+        // --- UIをリセットし、ローディング状態へ ---
+        hideAllMessages();
+        setLoadingState(true);
+
+        try {
+            // --- fetchを使用してGASにPOSTリクエストを送信 ---
+            const response = await fetch(GAS_URL, {
+                method: 'POST',
+                headers: {
+                    // これから送るデータはJSON形式であることを明記
+                    'Content-Type': 'application/json',
+                },
+                // JavaScriptオブジェクトをJSON文字列に変換して送信
+                body: JSON.stringify({ password: password }),
+            });
+
+            // HTTPステータスが200番台でない場合はエラーとして扱う
+            if (!response.ok) {
+                throw new Error(`サーバーからの応答エラー: ${response.status} ${response.statusText}`);
             }
+
+            // レスポンスをJSONとして解析
+            const data = await response.json();
+            console.log('GASからの応答データ:', data);
+
+            if (data.success) {
+                // --- 成功時の処理 ---
+                successMessage.textContent = data.message || 'パスワード認証に成功しました！';
+                successMessage.style.display = 'block';
+                displayFiles(data.files); // ファイル一覧を表示
+            } else {
+                // --- GAS側でエラーが返された場合の処理 ---
+                errorMessage.textContent = data.message || '認証に失敗しました。';
+                errorMessage.style.display = 'block';
+            }
+
+        } catch (error) {
+            // --- 通信失敗時の処理 (ネットワークエラーなど) ---
+            console.error('通信エラー:', error);
+            errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらくしてから再度お試しください。';
+            errorMessage.style.display = 'block';
+        } finally {
+            // --- 成功・失敗に関わらず、最後に必ず実行する処理 ---
+            setLoadingState(false); // UIをローディング解除状態へ
+        }
+    });
+
+
+    // =================================================================
+    // UI操作のためのヘルパー関数
+    // =================================================================
+
+    /**
+     * ローディング状態を設定または解除する関数
+     * @param {boolean} isLoading - ローディング状態にする場合は true
+     */
+    function setLoadingState(isLoading) {
+        submitBtn.disabled = isLoading;
+        loadingSpinner.style.display = isLoading ? 'block' : 'none';
+        buttonText.textContent = isLoading ? '認証中...' : '送信';
+    }
+
+    /**
+     * すべてのメッセージ（成功・エラー）を非表示にする関数
+     */
+    function hideAllMessages() {
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+        filesContainer.innerHTML = ''; // ファイル一覧をクリア
+    }
+
+    /**
+     * ファイル一覧を画面に表示する関数（サンプル）
+     * @param {Array<Object>} files - GASから受け取ったファイル情報の配列
+     */
+    function displayFiles(files) {
+        // 以前のファイル一覧をクリア
+        filesContainer.innerHTML = '';
+
+        if (!files || files.length === 0) {
+            filesContainer.innerHTML = '<p>表示できるファイルがありません。</p>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        files.forEach(file => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = file.url;
+            a.textContent = file.name;
+            a.target = '_blank'; // 新しいタブで開く
+            a.rel = 'noopener noreferrer';
+            li.appendChild(a);
+            ul.appendChild(li);
         });
-        
+        filesContainer.appendChild(ul);
+    }
+});        
         function hideAllMessages() {
             document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('successMessage').style.display = 'none';
