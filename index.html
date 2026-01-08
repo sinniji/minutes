@@ -216,163 +216,96 @@
         </div>
     </div>
 
-    <script>
-        // GASのWebアプリURLを設定（後で実際のURLに変更）
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyFgrivnyhzJRKJQWPAfm4KS-I-jMtVGNo9S11U9uYJj5Hjln0pV3LguhLxBF_vpL3F/exec';
+<script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyFgrivnyhzJRKJQWPAfm4KS-I-jMtVGNo9S11U9uYJj5Hjln0pV3LguhLxBF_vpL3F/exec';
+    
+    document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
         
-        document.getElementById('passwordForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        const password = document.getElementById('password').value;
+        const submitBtn = document.getElementById('submitBtn');
+        const buttonText = document.getElementById('buttonText');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const filesContainer = document.getElementById('filesContainer');
+        
+        hideAllMessages();
+        
+        // UIをローディング状態に
+        submitBtn.disabled = true;
+        buttonText.textContent = '認証中...';
+        loading.style.display = 'block';
+        
+        try {
+            // パラメータ付きURL作成
+            const targetUrl = `${GAS_URL}?password=${encodeURIComponent(password)}`;
             
-            const password = document.getElementById('password').value;
-            const submitBtn = document.getElementById('submitBtn');
-            const buttonText = document.getElementById('buttonText');
-            const loading = document.getElementById('loading');
-            const errorMessage = document.getElementById('errorMessage');
-            const successMessage = document.getElementById('successMessage');
-            const filesContainer = document.getElementById('filesContainer');
-            
-            // UIをリセット
-            hideAllMessages();
-            
-            // ローディング状態に設定
-            submitBtn.disabled = true;
-            buttonText.textContent = '認証中...';
-            loading.style.display = 'block';
-            
-            try {
-                // JSONPを使用してGASにリクエストを送信（CORS回避）
-                const jsonpUrl = `${GAS_URL}?password=${encodeURIComponent(password)}&callback=handleResponse`;
-                
-                console.log('Sending JSONP request to:', jsonpUrl);
-                
-                // JSONPリクエストを作成
-                const script = document.createElement('script');
-                script.src = jsonpUrl;
-                
-                // グローバルコールバック関数を定義
-                window.handleResponse = function(data) {
-                    console.log('JSONP Response data:', data);
-                    
-                    // スクリプトタグを削除
-                    document.head.removeChild(script);
-                    
-                    if (data.success) {
-                        // 成功時
-                        successMessage.textContent = 'パスワード認証に成功しました！';
-                        successMessage.style.display = 'block';
-                        
-                        // ファイル一覧を表示
-                        displayFiles(data.files);
-                        
-                    } else {
-                        // 失敗時
-                        errorMessage.textContent = data.message || 'パスワードが正しくありません。';
-                        errorMessage.style.display = 'block';
-                    }
-                    
-                    // ローディング状態を解除
-                    submitBtn.disabled = false;
-                    buttonText.textContent = '送信';
-                    loading.style.display = 'none';
-                };
-                
-                // エラーハンドリング
-                script.onerror = function() {
-                    console.error('JSONP request failed');
-                    errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらく後でもう一度お試しください。';
-                    errorMessage.style.display = 'block';
-                    
-                    // ローディング状態を解除
-                    submitBtn.disabled = false;
-                    buttonText.textContent = '送信';
-                    loading.style.display = 'none';
-                    
-                    // スクリプトタグを削除
-                    if (script.parentNode) {
-                        document.head.removeChild(script);
-                    }
-                };
-                
-                // スクリプトをDOMに追加してリクエストを実行
-                document.head.appendChild(script);
-                
-            } catch (error) {
-                console.error('Error:', error);
-                errorMessage.textContent = 'サーバーとの通信に失敗しました。しばらく後でもう一度お試しください。';
-                errorMessage.style.display = 'block';
-                
-                // ローディング状態を解除
-                submitBtn.disabled = false;
-                buttonText.textContent = '送信';
-                loading.style.display = 'none';
+            // fetch通信の実行
+            const response = await fetch(targetUrl, {
+                method: 'GET',
+                mode: 'cors',      // CORSを許可
+                credentials: 'omit' // ★超重要：Googleアカウントのクッキーを送信しない
+            });
+
+            if (!response.ok) {
+                throw new Error('ネットワークエラーが発生しました。');
             }
-        });
-        
-        function hideAllMessages() {
-            document.getElementById('errorMessage').style.display = 'none';
-            document.getElementById('successMessage').style.display = 'none';
-            document.getElementById('filesContainer').style.display = 'none';
-        }
-        
-        function displayFiles(files) {
-            const fileList = document.getElementById('fileList');
-            const filesContainer = document.getElementById('filesContainer');
+
+            const data = await response.json();
+            console.log('Response data:', data);
             
-            // ファイルリストをクリア
-            fileList.innerHTML = '';
-            
-            if (files && files.length > 0) {
-                files.forEach(file => {
-                    const listItem = document.createElement('li');
-                    listItem.className = 'file-item';
-                    
-                    const link = document.createElement('a');
-                    link.href = file.url;
-                    link.className = 'file-link';
-                    link.target = '_blank';
-                    link.rel = 'noopener noreferrer';
-                    
-                    // PDFアイコン
-                    const icon = document.createElement('div');
-                    icon.className = 'file-icon';
-                    icon.textContent = '📄';
-                    
-                    // ファイル情報コンテナ
-                    const fileInfo = document.createElement('div');
-                    fileInfo.className = 'file-info';
-                    
-                    // ファイル名
-                    const fileName = document.createElement('div');
-                    fileName.className = 'file-name';
-                    fileName.textContent = file.name;
-                    
-                    // ファイル詳細（サイズと更新日）
-                    const fileDetails = document.createElement('div');
-                    fileDetails.className = 'file-details';
-                    
-                    const updateDate = new Date(file.lastModified);
-                    const formattedDate = updateDate.toLocaleDateString('ja-JP');
-                    fileDetails.textContent = `${file.size} • 更新日: ${formattedDate}`;
-                    
-                    // 要素を組み立て
-                    fileInfo.appendChild(fileName);
-                    fileInfo.appendChild(fileDetails);
-                    
-                    link.appendChild(icon);
-                    link.appendChild(fileInfo);
-                    listItem.appendChild(link);
-                    fileList.appendChild(listItem);
-                });
-                
-                filesContainer.style.display = 'block';
+            if (data.success) {
+                successMessage.textContent = 'パスワード認証に成功しました！';
+                successMessage.style.display = 'block';
+                displayFiles(data.files);
             } else {
+                errorMessage.textContent = data.message || 'パスワードが正しくありません。';
+                errorMessage.style.display = 'block';
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            errorMessage.textContent = 'サーバーとの通信に失敗しました。スマホの場合はGoogleアカウントのログイン競合が疑われますが、今回の修正で回避できているはずです。';
+            errorMessage.style.display = 'block';
+        } finally {
+            // ローディング解除
+            submitBtn.disabled = false;
+            buttonText.textContent = '送信';
+            loading.style.display = 'none';
+        }
+    });
+    
+    function hideAllMessages() {
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('successMessage').style.display = 'none';
+        document.getElementById('filesContainer').style.display = 'none';
+    }
+    
+    function displayFiles(files) {
+        const fileList = document.getElementById('fileList');
+        const filesContainer = document.getElementById('filesContainer');
+        fileList.innerHTML = '';
+        
+        if (files && files.length > 0) {
+            files.forEach(file => {
                 const listItem = document.createElement('li');
                 listItem.className = 'file-item';
-                listItem.innerHTML = '<div class="file-link"><div class="file-icon">📁</div><div class="file-info"><div class="file-name">利用可能なPDFファイルがありません。</div></div></div>';
+                listItem.innerHTML = `
+                    <a href="${file.url}" class="file-link" target="_blank" rel="noopener noreferrer">
+                        <div class="file-icon">📄</div>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-details">${file.size} • 更新日: ${new Date(file.lastModified).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                    </a>`;
                 fileList.appendChild(listItem);
-                filesContainer.style.display = 'block';
-            }
+            });
+        } else {
+            fileList.innerHTML = '<li class="file-item"><div class="file-link">ファイルが見つかりませんでした。</div></li>';
         }
-    </script>
+        filesContainer.style.display = 'block';
+    }
+</script>
 </body>
 </html>
